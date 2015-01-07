@@ -1,0 +1,161 @@
+1st CHUNK
+
+      // Outputs type of component nearby in the selected direction (with a +/- offset) up to a certain distance away. directions are up/down/left/right
+        public static string compTypeNear(Component<int> SelectedComponent, string direction, float offset, float maxDistanceChecked) 
+        {
+            string compType = null;
+            for (int i = 0; i <= maxDistanceChecked; i++)
+            {
+                if (direction == "up")
+                {
+                    foreach (Component<int> comp in ComponentLocations.Components)
+                    {
+                        if (SelectedComponent.Name == comp.Name)
+                        {
+                            continue;
+                        }
+                        if (SelectedComponent.LocY < comp.LocY &&
+                            SelectedComponent.LocY + i >= comp.BoundBot * GraphGenerator.NS &&
+                            SelectedComponent.LocX + offset >= comp.BoundLeft * GraphGenerator.NS &&
+                            SelectedComponent.LocX + offset <= comp.BoundRight * GraphGenerator.NS &&
+                            ComponentLocations.Components.IndexOf(comp) > 1)
+                        {
+                            compType = comp.Type;
+
+                            if (comp.Type == null & comp.isWireDuct == true)
+                            {
+                                compType = "Wire Duct";
+                            }
+                            break;
+                        }
+                        .... (repeat for other directions)
+                    
+                    ========
+                    2nd CHUNK
+                    ========
+                    
+                    
+        public static void Gridding() // Primary method, generates grid and then calls Routing (which calls A*) to calculate wire lengths & paths
+        {
+            DeclarationsForGraphGen(); // A method that sets values
+            int indexer = 0; // index counter for pulling correct x and y values and for identifying current graph
+            int tempIndexer = 0;
+
+            foreach (Graph<int> Graph in Graphs) // 5 Graphs for the code of one!
+            {
+                while (Graph.DoneGridding != true) // dont know if this is necessary, but at least in the case a panel didn't 'exist' it shouldn't break as long as inputs to GraphGenerator are set.
+                {
+                    for (int x = 0; x <= NodeSpace(panXLength[indexer], NS); x++) // for every column untill no more are left
+                    {
+                        for (int y = 0; y <= NodeSpace(panYLength[indexer], NS); y++) // for every row until no more are left
+                        {
+                            #region Timer
+                            // Stops the timer every multiple of 100
+                            if (currentNode > (NodeSpace(panXLength[indexer], NS) * NodeSpace(panYLength[indexer], NS)) / 4 && currentNode % (100) == 0)
+                            {
+                                ComponentTypeWindow.stop(currentNode / 100,
+                                    (int)Math.Floor((decimal)(NodeSpace(panXLength[indexer], NS) + 1) * (decimal)(NodeSpace(panYLength[indexer], NS) + 1) / 100));
+
+
+                                // Checks to see if it is the last node in each graph
+                                if (Graphs.IndexOf(Graph) == Graphs.Count - 1 && tempIndexer != 100 && x == panXLength[panXLength.Length - 1] - 1)
+                                {
+                                    tempIndexer = 100;
+                                    ComponentTypeWindow.worker.ReportProgress(100);
+                                }
+                                else if (indexer == 1 && tempIndexer == 0)
+                                {
+                                    tempIndexer = 1;
+                                    ComponentTypeWindow.worker.ReportProgress(99);
+                                }
+                                else if (indexer == 2 && tempIndexer == 1)
+                                {
+                                    tempIndexer = 2;
+                                    ComponentTypeWindow.worker.ReportProgress(99);
+                                }
+                                else if (indexer == 3 && tempIndexer == 2)
+                                {
+                                    tempIndexer = 3;
+                                    ComponentTypeWindow.worker.ReportProgress(99);
+                                }
+                                else if (indexer == 4 && tempIndexer == 3)
+                                {
+                                    tempIndexer = 4;
+                                    ComponentTypeWindow.worker.ReportProgress(99);
+                                }
+                                else
+                                {
+                                    ComponentTypeWindow.worker.ReportProgress(0);
+                                }
+                            }
+
+                            // Starts a timer for every multiple of 100
+                            if (currentNode > (NodeSpace(panXLength[indexer], NS) * NodeSpace(panYLength[indexer], NS)) / 4 && currentNode % 100 == 0)
+                            {
+                                ComponentTypeWindow.start();
+                            }
+                            #endregion Timer
+
+                            GraphNode<int> node = new GraphNode<int>(currentNode); // creates an instance of GraphNode called node, type Int, set to the value of the Int currentNode
+                            Graph.AddNode(node, indexer, x*NS, y*NS); // adds the node to the nodelist and sets the side variable of the node
+                            if (currentNode > 1)
+                            {
+                                if (y != 0) // if not at the bottom of the grid
+                                {
+                                    if (indexer == 0 || indexer == 3 || indexer == 4)
+                                    {
+                                        weight = 1000;
+                                    }
+                                    else
+                                    {
+                                        weight = 16;
+                                    }
+                                    int compFuncWeight = compWeightingY(ComponentLocations.Components, x, y, indexer); // checks if nodes are inside a component, returns weight if they are (0 if not)
+                                    if (compFuncWeight != 0) // if the returned value is NOT 0 (in a component)
+                                    {
+                                        weight = compFuncWeight;
+                                    }
+                                    Graph.AddUndirectedEdge((GraphNode<int>)Graph.nodeSet.FindByValue(currentNode), (GraphNode<int>)Graph.nodeSet.FindByValue(currentNode - 1), weight);//adds edge
+                                    currentEdge++; // Edge counter
+                                }
+                                if (x != 0)
+                                {
+                                    weightTo = 16; weightFrom = 16;   // base values for weightTo and weightFrom
+                                    if (indexer == 0) // if checking the Main panel side only
+                                    {
+                                        if (x >= 0.5 * NodeSpace(panXLength[indexer], NS) - 0.5 * NodeSpace(MainWindow.panelSizeWidth, NS) && x <= 0.5 * NodeSpace(panXLength[indexer], NS)) // if x is between left corner and middle
+                                        {
+                                            weightTo = 16; weightFrom = 128;   // Lower cost to the left away from middle
+                                        }
+                                        if (x <= 0.5 * NodeSpace(panXLength[indexer], NS) + 0.5 * NodeSpace(MainWindow.panelSizeWidth, NS) && x >= 0.5 * NodeSpace(panXLength[indexer], NS)) // if x is between right corner and middle
+                                        {
+                                            weightTo = 128; weightFrom = 16;   // Lower cost to the right away from middle
+                                        }
+                                    }
+
+                                    int compFuncWeight = compWeightingX(ComponentLocations.Components, x, y, indexer); // checks if nodes are inside a component, returns weight if they are (0 if not)
+                                    if (compFuncWeight != 0) // if the returned value is NOT 0 (in a component)
+                                    {
+                                        weightTo = compFuncWeight;
+                                        weightFrom = compFuncWeight;
+                                    }
+
+                                    //This adds an edge from the current node to the node to the left
+                                    Graph.AddDirectedEdge((GraphNode<int>)Graph.nodeSet.FindByValue(currentNode), (GraphNode<int>)Graph.nodeSet.FindByValue(currentNode - (NodeSpace(panYLength[indexer], NS) + 1)), weightTo);
+                                    currentEdge++; // Edge counter
+                                    //This adds one from the node to the left to the current node
+                                    Graph.AddDirectedEdge((GraphNode<int>)Graph.nodeSet.FindByValue(currentNode - (NodeSpace(panYLength[indexer], NS) + 1)), (GraphNode<int>)Graph.nodeSet.FindByValue(currentNode), weightFrom);
+                                    currentEdge++; // Edge counter
+                                }
+                            }
+                            currentNode++; // Adds 1 to the value of current node
+                        }
+                    }
+                    Graph.DoneGridding = true;
+                    indexer++;
+                }
+            }
+            //panMain.AddUndirectedEdge((GraphNode<int>)panMain.nodeSet.FindByValue(5), (GraphNode<int>)panTop.nodeSet.FindByValue(5), 0);
+            DrawConnectingEdges(); // draws edges connecting the separate graphs.
+            Routing(); // send the program to routing
+        }
